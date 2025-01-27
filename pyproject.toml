@@ -7,8 +7,13 @@ name = "dnd_sound_engine"
 version = "0.1.0"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-pydub = {version = "^0.25.1"}
+python = "^3.10,<3.14"
+pygame = {version = "^2.6.1"}
+tqdm = {version = "^4.67.1"}
+PySide6 = {version = "~=6.8.1.1"}
+PySide6-Essentials = {version = "~=6.8.1.1"}
+PySide6-Addons = {version = "~=6.8.1.1"}
+
 
 [tool.poetry.group.formatting.dependencies]
 black="^24.10.0"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 from typing import TYPE_CHECKING, Literal, Mapping, MutableMapping, TypedDict
 
 if TYPE_CHECKING:
@@ -22,3 +23,4 @@ ScenesData: TypeAlias = MutableMapping[str, list[SceneObject]]
 class ObjectMap(TypedDict):
     shortHands: Mapping[str, str]
     scenes: ScenesData
+    root: pathlib.Path

@@ -13,38 +13,38 @@ if TYPE_CHECKING:
 logger = None
 
 
-def install_ffmpeg() -> int:
-    install_shell = subprocess.Popen(
-        "winget install --id Gyan.FFmpeg --source winget",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    stdout, stderr = install_shell.communicate()
-    print(f"Out: {stdout}")
-    print(f"Err: {stderr}")
-    return install_shell.returncode
+# def install_ffmpeg() -> int:
+#     install_shell = subprocess.Popen(
+#         "winget install --id Gyan.FFmpeg --source winget",
+#         stdout=subprocess.PIPE,
+#         stderr=subprocess.PIPE,
+#     )
+#     stdout, stderr = install_shell.communicate()
+#     print(f"Out: {stdout}")
+#     print(f"Err: {stderr}")
+#     return install_shell.returncode
 
 
-def prompt_install_ffmpeg() -> int:
-    userin = input("FFmpeg not detected, install? [Y/n]")
-    if userin.lower() == "y" or not userin:
-        return install_ffmpeg()
-    return 0
+# def prompt_install_ffmpeg() -> int:
+#     userin = input("FFmpeg not detected, install? [Y/n]")
+#     if userin.lower() == "y" or not userin:
+#         return install_ffmpeg()
+#     return 0
 
 
-def ensure_ffmpeg(no_interaction: bool = False) -> NoReturn | None:
-    # Check if ffmpeg is installed:
-    try:
-        subprocess.Popen(
-            "ffmpeg -version",
-        )
-    except FileNotFoundError:
-        # error, no ffmpeg
-        return (
-            sys.exit(install_ffmpeg())
-            if no_interaction
-            else sys.exit(prompt_install_ffmpeg())
-        )
+# def ensure_ffmpeg(no_interaction: bool = False) -> NoReturn | None:
+#     # Check if ffmpeg is installed:
+#     try:
+#         subprocess.Popen(
+#             "ffmpeg -version",
+#         )
+#     except FileNotFoundError:
+#         # error, no ffmpeg
+#         return (
+#             sys.exit(install_ffmpeg())
+#             if no_interaction
+#             else sys.exit(prompt_install_ffmpeg())
+#         )
 
 
 default_log_level = logging.WARNING

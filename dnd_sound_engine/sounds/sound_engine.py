@@ -6,14 +6,15 @@ from copy import deepcopy
 from pprint import pformat
 from typing import TYPE_CHECKING
 
-from pygame import mixer
+# from pygame import mixer
+from PySide6 import QtCore, QtMultimedia
 from tqdm import tqdm
 
 from ..utils import get_default_logger
 from . import types
 
 if TYPE_CHECKING:
-    from typing import Any, MutableMapping
+    from typing import Optional
 
 logger = get_default_logger(__name__)
 
@@ -61,25 +62,78 @@ def validate_mapping(data_map: types.ObjectMap, update_map: bool = True):
     return data_map_copy if update_map else data_map
 
 
+class SoundPlayer(QtMultimedia.QMediaPlayer):
+
+    def __init__(
+        self,
+        sound_url: QtCore.QUrl,
+        audioOutput: QtMultimedia.QAudioOutput,
+        parent: Optional[QtCore.QObject] = None,
+        fadein: Optional[int] = None,
+        fadeout: Optional[int] = None,
+    ):
+        super().__init__(parent)
+        self.setAudioOutput(audioOutput)
+        self.audioOutput().setVolume(0.5)
+        self.audioOutput().volume()
+        self.setSource(sound_url)
+        self.fadeinT = fadein
+        self.fadeoutT = fadeout
+        self.fadeoutProp = QtCore.QPropertyAnimation(self.audioOutput(), b"volume")
+        self.fadeinProp = QtCore.QPropertyAnimation(self.audioOutput(), b"volume")
+        self.fadeoutProp.setEasingCurve(QtCore.QEasingCurve.Type.Linear)
+        self.fadeinProp.setEasingCurve(QtCore.QEasingCurve.Type.Linear)
+
+    def fadeout(self):
+        if self.fadeoutT is None:
+            return
+        self.fadeoutProp.setDuration(self.fadeoutT)
+        self.fadeoutProp.setStartValue(self.audioOutput().volume())
+        self.fadeoutProp.setEndValue(0)
+        self.fadeoutProp.start()
+
+    def fadein(self):
+        if self.fadeinT is None:
+            return
+        self.fadeinProp.setDuration(self.fadeinT)
+        self.fadeinProp.setStartValue(0.01)
+        self.fadeinProp.setEndValue(self.audioOutput().volume())
+        self.fadeinProp.start()
+
+    def play(self):
+        if self.fadeinT is not None:
+            self.fadein()
+        super().play()
+
+    def stop(self):
+        if self.fadeoutT is not None:
+            self.fadeout()
+        super().stop()
+
+
 class SoundEngine:
 
     def __init__(
         self, data_map: dict, starting_id: str, load: bool = True, validate: bool = True
     ):
         self.data_map = validate_mapping(data_map) if validate else data_map
-        self.sounds: dict[str, mixer.Sound] = {}
-        self.channels: dict[tuple[str, int], mixer.Channel] = {}
+        self.sounds: dict[str, SoundPlayer] = {}
+        self.audioDevice = QtMultimedia.QAudioOutput()
+        # self.channels: dict[tuple[str, int], mixer.Channel] = {}
         self.starting_id = starting_id
         if load:
             self.load()
 
     def load(self):
-        if not mixer.get_init():
-            mixer.init()
+        # if not mixer.get_init():
+        #     mixer.init()
         self.sounds_root = self.data_map["root"] / "sounds"
         print("Loading sounds...")
         for id_, sound_path in tqdm(self.data_map["shortHands"].items()):
-            self.sounds[id_] = mixer.Sound(str(self.sounds_root / sound_path))
+            self.sounds[id_] = SoundPlayer(
+                QtCore.QUrl.fromLocalFile(self.sounds_root / sound_path),
+                self.audioDevice,
+            )
 
     def __str__(self):
         return pformat(self.data_map)

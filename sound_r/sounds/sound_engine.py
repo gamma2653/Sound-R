@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pathlib
-import time
 from copy import deepcopy
 from pprint import pformat
 from typing import TYPE_CHECKING
@@ -67,56 +65,72 @@ class SoundPlayer(QtMultimedia.QMediaPlayer):
     def __init__(
         self,
         sound_url: QtCore.QUrl,
-        audioOutput: QtMultimedia.QAudioOutput,
         parent: Optional[QtCore.QObject] = None,
         fadein: Optional[int] = None,
         fadeout: Optional[int] = None,
     ):
         super().__init__(parent)
-        self.setAudioOutput(audioOutput)
-        self.audioOutput().setVolume(0.5)
-        self.audioOutput().volume()
+        self.audio_out = QtMultimedia.QAudioOutput()
+        self.setAudioOutput(self.audio_out)
+        self.audio_out.setVolume(0.5)
+        self.audio_out.volume()
         self.setSource(sound_url)
         self.fadeinT = fadein
         self.fadeoutT = fadeout
-        self.fadeoutProp = QtCore.QPropertyAnimation(self.audioOutput(), b"volume")
-        self.fadeinProp = QtCore.QPropertyAnimation(self.audioOutput(), b"volume")
+        self.fadeoutProp = QtCore.QPropertyAnimation(self.audio_out, b"volume")
+        self.fadeinProp = QtCore.QPropertyAnimation(self.audio_out, b"volume")
         self.fadeoutProp.setEasingCurve(QtCore.QEasingCurve.Type.Linear)
         self.fadeinProp.setEasingCurve(QtCore.QEasingCurve.Type.Linear)
 
-    def fadeout(self):
+    def fadeout_pre(self):
         if self.fadeoutT is None:
             return
         self.fadeoutProp.setDuration(self.fadeoutT)
         self.fadeoutProp.setStartValue(self.audioOutput().volume())
         self.fadeoutProp.setEndValue(0)
+
+    def fadeout_post(self):
         self.fadeoutProp.start()
 
-    def fadein(self):
+    def fadein_pre(self):
         if self.fadeinT is None:
             return
         self.fadeinProp.setDuration(self.fadeinT)
         self.fadeinProp.setStartValue(0.01)
         self.fadeinProp.setEndValue(self.audioOutput().volume())
+
+    def fadein_post(self):
         self.fadeinProp.start()
 
     def play(self):
         if self.fadeinT is not None:
-            self.fadein()
+            self.fadein_pre()
         super().play()
+        if self.fadeinT is not None:
+            self.fadein_post()
 
     def stop(self):
         if self.fadeoutT is not None:
-            self.fadeout()
+            self.fadeout_pre()
         super().stop()
+        if self.fadeoutT is not None:
+            self.fadeout_post()
 
 
 class SoundEngine:
 
     def __init__(
-        self, data_map: dict, starting_id: str, load: bool = True, validate: bool = True
+        self,
+        data_map: types.ObjectMap,
+        starting_id: str,
+        load: bool = True,
+        validate: bool = True,
     ):
-        self.data_map = validate_mapping(data_map) if validate else data_map
+        self.data_map = (
+            validate_mapping(data_map)
+            if validate
+            else validate_mapping(data_map, update_map=False)
+        )
         self.sounds: dict[str, SoundPlayer] = {}
         self.audioDevice = QtMultimedia.QAudioOutput()
         # self.channels: dict[tuple[str, int], mixer.Channel] = {}
@@ -125,8 +139,7 @@ class SoundEngine:
             self.load()
 
     def load(self):
-        # if not mixer.get_init():
-        #     mixer.init()
+        logger.info("Loading sound engine...")
         self.sounds_root = self.data_map["root"] / "sounds"
         print("Loading sounds...")
         for id_, sound_path in tqdm(self.data_map["shortHands"].items()):
@@ -134,6 +147,8 @@ class SoundEngine:
                 QtCore.QUrl.fromLocalFile(self.sounds_root / sound_path),
                 self.audioDevice,
             )
+            # time.sleep(3)
+        print("Sounds loaded.")
 
     def __str__(self):
         return pformat(self.data_map)
@@ -158,11 +173,8 @@ class SoundEngine:
         obj_data = self.data_map["scenes"][self.scene_id][self.idx]
         if obj_data["type"] == "sound" and not obj_data.get("retain", False):
             if "fadeout" in obj_data.keys():
-                self.channels[(self.scene_id, self.idx)].fadeout(obj_data["fadeout"])
-                time.sleep(obj_data["fadeout"])
-            else:
-                self.channels[(self.scene_id, self.idx)].stop()
-            del self.channels[(self.scene_id, self.idx)]
+                self.sounds[obj_data["payload"]].fadeoutT = obj_data["fadeout"]
+            self.sounds[obj_data["payload"]].stop()
 
     def step(self):
         # clear previous if should be cleared
@@ -172,9 +184,12 @@ class SoundEngine:
 
     def play_sound(self, scene_id, idx):
         scene_obj = self.data_map["scenes"][scene_id][idx]
-        self.channels[(scene_id, idx)] = self.sounds[scene_obj["payload"]].play()
+        # self.channels[(scene_id, idx)] = self.sounds[scene_obj["payload"]].play()
+        self.sounds[scene_obj["payload"]].play()
         print(f"Playing {scene_id}: [{idx}]")
         # time.sleep(10)
 
     def start(self):
+        logger.debug("Starting sound engine...")
         self.play_scene(self.starting_id)
+        logger.info("Sound engine started")

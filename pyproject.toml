@@ -3,8 +3,12 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "dnd_sound_engine"
+name = "sound_r"
 version = "0.1.0"
+authors = [
+    "Chris De Jesus <christopher2653@gmail.com>"
+]
+description = "A sound cue system for D&D"
 
 [tool.poetry.dependencies]
 python = "^3.10,<3.14"

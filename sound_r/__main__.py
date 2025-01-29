@@ -10,14 +10,9 @@ from PySide6 import QtGui, QtWidgets
 
 from .gui.app import MainWindow
 from .sounds import types
+from .utils import get_default_logger
 
-# os.environ["QTDriver"] =
-
-
-# if __name__ == "__main__":
-#     parser.add_argument("--no-interaction", "-ni", action="store_true", default=False)
-#     utils.ensure_ffmpeg(known_args.no_interaction)
-
+logger = get_default_logger(__name__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -25,7 +20,7 @@ if __name__ == "__main__":
         "--data_map",
         "-dm",
         action="store",
-        default=str(pathlib.Path(os.getcwd(), "dnd_sound_engine", ".cache")),
+        default=str(pathlib.Path(os.getcwd(), ".cache")),
     )
     known_args, _ = parser.parse_known_args()
     DATA_FOLDER = known_args.data_map

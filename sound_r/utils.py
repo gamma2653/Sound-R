@@ -1,53 +1,34 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
-import subprocess
-import sys
+import pathlib
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import NoReturn, Optional
+    from typing import Optional
 
+from .sounds import types
+
+TIME_FORMAT = "%H:%M:%S"
 
 logger = None
 
 
-# def install_ffmpeg() -> int:
-#     install_shell = subprocess.Popen(
-#         "winget install --id Gyan.FFmpeg --source winget",
-#         stdout=subprocess.PIPE,
-#         stderr=subprocess.PIPE,
-#     )
-#     stdout, stderr = install_shell.communicate()
-#     print(f"Out: {stdout}")
-#     print(f"Err: {stderr}")
-#     return install_shell.returncode
+def load_map(map_path: pathlib.Path):
+    with map_path.open() as f:
+        OBJECT_MAP: types.ObjectMap = json.load(f)
+        OBJECT_MAP["root"] = map_path.parent
 
 
-# def prompt_install_ffmpeg() -> int:
-#     userin = input("FFmpeg not detected, install? [Y/n]")
-#     if userin.lower() == "y" or not userin:
-#         return install_ffmpeg()
-#     return 0
+def parse_time_field(time_str: str):
+    datetime_ = datetime.strptime(time_str, TIME_FORMAT)
+    return datetime_.time()
 
 
-# def ensure_ffmpeg(no_interaction: bool = False) -> NoReturn | None:
-#     # Check if ffmpeg is installed:
-#     try:
-#         subprocess.Popen(
-#             "ffmpeg -version",
-#         )
-#     except FileNotFoundError:
-#         # error, no ffmpeg
-#         return (
-#             sys.exit(install_ffmpeg())
-#             if no_interaction
-#             else sys.exit(prompt_install_ffmpeg())
-#         )
-
-
-default_log_level = logging.WARNING
+default_log_level = logging.DEBUG
 
 
 def get_log_level(level) -> int:

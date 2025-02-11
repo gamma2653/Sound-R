@@ -117,15 +117,19 @@ class SoundPlayer(QtMultimedia.QMediaPlayer):
             self.fadeout_post()
 
 
-class SoundEngine:
+class SoundEngine(QtCore.QObject):
+    sound_looped = QtCore.Signal(tuple)  # (scene_id, sound_id)
+    clear_loop = QtCore.Signal(tuple)  # (scene_id, sound_id)
 
     def __init__(
         self,
         data_map: types.ObjectMap,
         starting_id: str,
+        parent: Optional[QtCore.QObject] = None,
         load: bool = True,
         validate: bool = True,
     ):
+        super().__init__(parent)
         self.data_map = (
             validate_mapping(data_map)
             if validate
@@ -152,6 +156,16 @@ class SoundEngine:
 
     def __str__(self):
         return pformat(self.data_map)
+
+    def get_cue_id(self, scene_id: str, idx: int):
+        return self.data_map["scenes"][scene_id][idx]["id"]
+
+    def get_payload(self, scene_id: str, idx: int):
+        return self.data_map["scenes"][scene_id][idx]["payload"]
+
+    def get_scene_and_sound(self):
+        scene_id = self.scene_id
+        return scene_id, self.get_cue_id(scene_id, self.idx)
 
     def play_obj(self, scene_id: str, idx: int):
         scene_data = self.data_map["scenes"][scene_id]
@@ -182,9 +196,24 @@ class SoundEngine:
         self.idx += 1
         self.play_obj(self.scene_id, self.idx)
 
-    def play_sound(self, scene_id, idx):
+    def attach_on_loop(self, scene_id: str, idx: int):
+        sound_payload = self.get_payload(scene_id, idx)
+        sound_id = self.get_cue_id(scene_id, idx)
+
+        def emit_on_loop(pos: int):
+            if pos == 0:
+                self.sound_looped.emit((scene_id, sound_id))
+
+        self.sounds[sound_payload].positionChanged.connect(emit_on_loop)
+
+    def play_sound(self, scene_id: str, idx: int):
         scene_obj = self.data_map["scenes"][scene_id][idx]
-        # self.channels[(scene_id, idx)] = self.sounds[scene_obj["payload"]].play()
+        sound_player = self.sounds[scene_obj["payload"]]
+        if scene_obj.get("loop", False):
+            sound_player.setLoops(QtMultimedia.QMediaPlayer.Loops.Infinite)
+            self.attach_on_loop(scene_id, idx)
+        else:
+            sound_player.setLoops(QtMultimedia.QMediaPlayer.Loops.Once)
         self.sounds[scene_obj["payload"]].play()
         print(f"Playing {scene_id}: [{idx}]")
         # time.sleep(10)

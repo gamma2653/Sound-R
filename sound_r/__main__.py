@@ -20,7 +20,8 @@ if __name__ == "__main__":
         "--data_map",
         "-dm",
         action="store",
-        default=str(pathlib.Path(os.getcwd(), ".cache")),
+        type=lambda s: str(pathlib.Path(s).resolve()),
+        default=".cache",
     )
     known_args, _ = parser.parse_known_args()
     DATA_FOLDER = known_args.data_map

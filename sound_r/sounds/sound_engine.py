@@ -121,6 +121,14 @@ class SoundEngine(QtCore.QObject):
     sound_looped = QtCore.Signal(tuple)  # (scene_id, sound_id)
     clear_loop = QtCore.Signal()
     select_image = QtCore.Signal(str, float)
+    scene_looped = QtCore.Signal(str)
+
+    NOT_PLAYING = (
+        QtMultimedia.QMediaPlayer.MediaStatus.NoMedia,
+        QtMultimedia.QMediaPlayer.MediaStatus.EndOfMedia,
+        QtMultimedia.QMediaPlayer.MediaStatus.InvalidMedia,
+        QtMultimedia.QMediaPlayer.MediaStatus.StalledMedia,
+    )
 
     @property
     def art_path(self):
@@ -129,6 +137,9 @@ class SoundEngine(QtCore.QObject):
     @property
     def sound_path(self):
         return self.data_map["root"] / "sounds"
+
+    def attach_scene_loop_handler(self, handler):
+        self.scene_loop_handlers.append(handler)
 
     def __init__(
         self,
@@ -149,6 +160,7 @@ class SoundEngine(QtCore.QObject):
         # self.channels: dict[tuple[str, int], mixer.Channel] = {}
         self.starting_id = starting_id
         self.loop_scenes = False
+        self.scene_loop_handler = []
         if load:
             self.load()
 
@@ -205,18 +217,52 @@ class SoundEngine(QtCore.QObject):
     def check_stop(self):
         obj_data = self.data_map["scenes"][self.scene_id][self.idx]
         if obj_data["type"] == "sound" and not obj_data.get("retain", False):
+            sound_player = self.sounds[obj_data["payload"]]
             if "fadeout" in obj_data.keys():
-                self.sounds[obj_data["payload"]].fadeoutT = obj_data["fadeout"]
+                sound_player.fadeoutT = obj_data["fadeout"]
             self.clear_loop.emit()
-            self.sounds[obj_data["payload"]].stop()
+            print("clear loop emitted")
+            if sound_player.mediaStatus() not in SoundEngine.NOT_PLAYING:
+                sound_player.stop()
 
     def step(self):
         # clear previous if should be cleared
         self.check_stop()
         self.idx += 1
+        if self.idx >= len(self.data_map["scenes"][self.scene_id]):
+            if self.loop_scenes:
+                self.idx = 0
+                self.scene_looped.emit(self.scene_id)
+            else:
+                return
         self.play_obj(self.scene_id, self.idx)
 
-    def attach_on_loop(self, scene_id: str, idx: int):
+    @property
+    def active_scene_obj(self):
+        return self.data_map["scenes"][self.scene_id][self.idx]
+
+    def handle_end(self):
+        sound_player = self.sounds[self.active_scene_obj["payload"]]
+        scene_obj = self.active_scene_obj
+
+        def _handle_end(media_status: QtMultimedia.QMediaPlayer.MediaStatus):
+            match media_status:
+                case QtMultimedia.QMediaPlayer.MediaStatus.EndOfMedia:
+                    print("end of media")
+                    # detach loop handler
+                    if scene_obj["type"] == "sound":
+                        print("end of sound")
+                        if scene_obj.get("loop", False):
+                            sound_player.positionChanged.disconnect()
+                            self.scene_looped.emit(scene_obj["id"])
+                            return
+                        self.step()
+                case _:
+                    pass
+
+        return _handle_end
+
+    def notify_on_loop(self, scene_id: str, idx: int):
         sound_payload = self.get_payload(scene_id, idx)
         sound_id = self.get_cue_id(scene_id, idx)
 
@@ -231,10 +277,11 @@ class SoundEngine(QtCore.QObject):
         sound_player = self.sounds[scene_obj["payload"]]
         if scene_obj.get("loop", False):
             sound_player.setLoops(QtMultimedia.QMediaPlayer.Loops.Infinite)
-            self.attach_on_loop(scene_id, idx)
+            self.notify_on_loop(scene_id, idx)
         else:
             sound_player.setLoops(QtMultimedia.QMediaPlayer.Loops.Once)
-        self.sounds[scene_obj["payload"]].play()
+        sound_player.mediaStatusChanged.connect(self.handle_end())
+        sound_player.play()
         print(f"Playing {scene_id}: [{idx}]")
         # time.sleep(10)
 

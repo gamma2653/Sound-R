@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 os.environ["QT_MULTIMEDIA_PREFERRED_PLUGINS"] = "windowsmediafoundation"
@@ -93,9 +94,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 f"Looped [{scene_sound[0]}: {scene_sound[1]}]"
             )
         )
-        self.sound_engine.clear_loop.connect(
-            lambda: self.sound_engine.sound_looped.disconnect()
+        self.sound_engine.scene_looped.connect(
+            lambda scene_id: self.status_box.append(f"Looped scene: {scene_id}")
         )
+        # self.sound_engine.clear_loop.connect(
+        #     lambda: self.sound_engine.sound_looped.disconnect()
+        # )
         self.sound_engine.select_image.connect(self.display_image)
 
         actions_layout.addWidget(self.step_btn)
@@ -107,11 +111,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def start(self):
         logger.info("Starting MainWindow")
-        self.showMaximized()
         self.sound_engine.start()
         scene_id, sound_id = self.sound_engine.get_scene_and_sound()
         self.status_box.append(f"Starting [{scene_id}: {sound_id}]")
         logger.info("MainWindow started")
+        self.showMaximized()
 
     def step(self):
         scene_id, sound_id = self.sound_engine.get_scene_and_sound()

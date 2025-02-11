@@ -119,7 +119,16 @@ class SoundPlayer(QtMultimedia.QMediaPlayer):
 
 class SoundEngine(QtCore.QObject):
     sound_looped = QtCore.Signal(tuple)  # (scene_id, sound_id)
-    clear_loop = QtCore.Signal(tuple)  # (scene_id, sound_id)
+    clear_loop = QtCore.Signal()
+    select_image = QtCore.Signal(str, float)
+
+    @property
+    def art_path(self):
+        return self.data_map["root"] / "art"
+
+    @property
+    def sound_path(self):
+        return self.data_map["root"] / "sounds"
 
     def __init__(
         self,
@@ -139,20 +148,23 @@ class SoundEngine(QtCore.QObject):
         self.audioDevice = QtMultimedia.QAudioOutput()
         # self.channels: dict[tuple[str, int], mixer.Channel] = {}
         self.starting_id = starting_id
+        self.loop_scenes = False
         if load:
             self.load()
 
     def load(self):
         logger.info("Loading sound engine...")
-        self.sounds_root = self.data_map["root"] / "sounds"
         print("Loading sounds...")
-        for id_, sound_path in tqdm(self.data_map["shortHands"].items()):
+        for id_, sound_path in tqdm(self.data_map["soundIDs"].items()):
             self.sounds[id_] = SoundPlayer(
-                QtCore.QUrl.fromLocalFile(self.sounds_root / sound_path),
+                QtCore.QUrl.fromLocalFile(self.sound_path / sound_path),
                 self.audioDevice,
             )
             # time.sleep(3)
-        print("Sounds loaded.")
+        if "globalOptions" in self.data_map:
+            self.loop_scenes = self.data_map["globalOptions"].get("loopScenes", False)
+        logger.debug("Loop scenes: %s", self.loop_scenes)
+        logger.info("Sound engine loaded")
 
     def __str__(self):
         return pformat(self.data_map)
@@ -173,8 +185,15 @@ class SoundEngine(QtCore.QObject):
         match scene_obj["type"]:
             case "sound":
                 self.play_sound(scene_id, idx)
+                if scene_obj.get("step", False):
+                    self.step()
             case "cue":
                 self.play_scene(scene_obj["payload"])
+            case "art":
+                scale = scene_obj.get("scale", 1.0)
+                self.select_image.emit(scene_obj["payload"], scale)
+                if scene_obj.get("step", True):
+                    self.step()
             case scene_obj_type:
                 logger.warning(f"Unknown scene object type: {scene_obj_type}")
 
@@ -188,6 +207,7 @@ class SoundEngine(QtCore.QObject):
         if obj_data["type"] == "sound" and not obj_data.get("retain", False):
             if "fadeout" in obj_data.keys():
                 self.sounds[obj_data["payload"]].fadeoutT = obj_data["fadeout"]
+            self.clear_loop.emit()
             self.sounds[obj_data["payload"]].stop()
 
     def step(self):
